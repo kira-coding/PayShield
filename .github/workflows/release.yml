@@ -13,6 +13,8 @@ jobs:
   build-and-release:
     name: Build & Release
     runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
 
     steps:
       # ── 1. Checkout ────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ jobs:
       #   base64 -w 0 release.jks | xclip   # copy to clipboard
       #
       - name: Configure signing
-        if: secrets.KEYSTORE_BASE64 != ''
+        if: env.HAS_KEYSTORE == 'true'
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.jks
           cat >> android/local.properties <<EOF
@@ -77,7 +79,7 @@ jobs:
           EOF
 
       - name: Inject key.properties
-        if: secrets.KEYSTORE_BASE64 != ''
+        if: env.HAS_KEYSTORE == 'true'
         run: |
           cat > android/key.properties <<EOF
           storePassword=${{ secrets.STORE_PASSWORD }}
