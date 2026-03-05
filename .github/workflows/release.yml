@@ -1,0 +1,144 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so we can read tags
+
+      # ── 2. Derive version from pubspec.yaml ────────────────────────────────
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          echo "name=v$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION"  >> $GITHUB_OUTPUT
+          echo "Resolved version: v$VERSION"
+
+      # ── 3. Set up Java (required for Android build) ────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # ── 4. Set up Flutter ──────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # ── 5. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: flutter pub get
+
+      # ── 6. Run tests ───────────────────────────────────────────────────────
+      - name: Run unit tests
+        run: flutter test
+
+      # ── 7. Configure signing (optional — skip if secrets not set) ──────────
+      #
+      # To enable APK/AAB signing, add these secrets to your GitHub repo:
+      #   KEYSTORE_BASE64  – base64-encoded .jks keystore file
+      #   KEY_ALIAS        – key alias inside the keystore
+      #   KEY_PASSWORD     – key password
+      #   STORE_PASSWORD   – keystore password
+      #
+      # Generate a keystore:
+      #   keytool -genkey -v -keystore release.jks -alias <alias> \
+      #           -keyalg RSA -keysize 2048 -validity 10000
+      #   base64 -w 0 release.jks | xclip   # copy to clipboard
+      #
+      - name: Configure signing
+        if: secrets.KEYSTORE_BASE64 != ''
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.jks
+          cat >> android/local.properties <<EOF
+          storeFile=release.jks
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      - name: Inject key.properties
+        if: secrets.KEYSTORE_BASE64 != ''
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=release.jks
+          EOF
+
+      # ── 8. Build universal APK (fat — works on arm32, arm64, x86_64) ───────
+      - name: Build universal APK
+        run: flutter build apk --release
+        # Outputs: build/app/outputs/flutter-apk/app-release.apk
+
+      # ── 9. Build AAB ────────────────────────────────────────────────────────
+      - name: Build AAB
+        run: flutter build appbundle --release
+        # Outputs: build/app/outputs/bundle/release/app-release.aab
+
+      # ── 10. Rename artifacts with version ──────────────────────────────────
+      - name: Rename build artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.name }}"
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             payment_verifier-${VERSION}-universal.apk
+          cp build/app/outputs/bundle/release/app-release.aab \
+             payment_verifier-${VERSION}.aab
+
+      # ── 11. Create source zip (excluding build/ and .dart_tool/) ───────────
+      - name: Create source zip
+        run: |
+          VERSION="${{ steps.version.outputs.name }}"
+          zip -r payment_verifier-${VERSION}-source.zip . \
+            --exclude "*.git*" \
+            --exclude "build/*" \
+            --exclude ".dart_tool/*" \
+            --exclude ".idea/*"
+
+      # ── 12. Create GitHub Release & upload assets ──────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Payment Verifier ${{ steps.version.outputs.name }}
+          body: |
+            ## Payment Verifier ${{ steps.version.outputs.name }}
+
+            ### Downloads
+            | File | Description |
+            |------|-------------|
+            | `*-universal.apk` | Universal APK — install directly on any Android device (arm32, arm64, x86_64) |
+            | `*.aab` | Android App Bundle — for Google Play submission |
+            | `*-source.zip` | Full source code |
+
+            ### Install APK
+            Enable **Install from unknown sources** on your device, then open the APK file.
+          files: |
+            payment_verifier-${{ steps.version.outputs.name }}-universal.apk
+            payment_verifier-${{ steps.version.outputs.name }}.aab
+            payment_verifier-${{ steps.version.outputs.name }}-source.zip
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
