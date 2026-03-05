@@ -69,7 +69,7 @@ Follow these steps carefully:
 3. Follow the on-screen prompts to install.
 
 
-If you run into issues, reply to this post with details! Enjoy the app. 🚀
+If you run into issues, post it here.
 ---
 ---
 
