@@ -45,7 +45,32 @@ Incoming SMS
 │    or on next network reconnect            │
 └─────────────────────────────────────────────┘
 ```
+---
+### Installation Instructions
 
+Since this app is a custom Flutter build and not available on the Google Play Store, you'll need to sideload the APK file. Android's security features (like Google Play Protect) may block or warn about unknown sources during installation. Additionally, the app requires special permissions for SMS access and running background services reliably (even when battery optimization is enabled). These might not be granted automatically, so you'll need to manually adjust settings after installation.
+
+Follow these steps carefully:
+
+#### Step 1: Prepare for Installation (Disable Play Protect Temporarily)
+1. Open the Google Play Store app on your Android device.
+2. Tap your profile icon in the top right corner.
+3. Select **Play Protect** (or search for it in settings).
+4. Tap the gear icon (settings) in Play Protect.
+5. Turn off **Scan apps with Play Protect** (you can turn it back on after installation).
+6. Download the APK file from [https://github.com/kira-coding/PayShield/releases].
+7. When prompted during installation, allow installation from unknown sources (this is usually in your browser or file manager settings).
+
+**Note:** If you get a warning like "File might be harmful," tap **Install anyway** after disabling Play Protect. This is common for non-Play Store apps.
+
+#### Step 2: Install the App
+1. Locate the downloaded APK file (usually in your Downloads folder).
+2. Tap the APK to start installation.
+3. Follow the on-screen prompts to install.
+
+
+If you run into issues, reply to this post with details! Enjoy the app. 🚀
+---
 ---
 
 ## Setup
